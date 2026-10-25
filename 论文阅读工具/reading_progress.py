@@ -147,6 +147,11 @@ def merge(entries: list[dict]) -> list[dict]:
     return sorted(newest.values(), key=lambda e: str(e.get("日期") or ""), reverse=True)
 
 
+def short_title(entry: dict) -> str:
+    paper = entry.get("论文") or {}
+    return str(paper.get("短标题") or paper.get("标题") or "").strip()
+
+
 def _cell(value) -> str:
     return str(value or "").replace("|", "／").replace("\n", " ").strip()
 
@@ -163,11 +168,13 @@ def render_markdown(papers: list[dict]) -> str:
     for p in papers:
         paper = p.get("论文") or {}
         todo = len(_items(p.get("下一步")))
-        lines.append(f"| {_cell(p.get('日期'))} | {_cell(paper.get('标题'))} | {_cell(p.get('状态'))} | "
+        lines.append(f"| {_cell(p.get('日期'))} | {_cell(short_title(p))} | {_cell(p.get('状态'))} | "
                      f"{_cell(p.get('采用'))} | {_cell(p.get('一句话结论'))} | {todo or ''} |")
     for p in papers:
         paper = p.get("论文") or {}
-        lines += ["", f"## {_cell(paper.get('标题'))}", ""]
+        lines += ["", f"## {_cell(short_title(p))}", ""]
+        if paper.get("短标题") and paper.get("标题"):
+            lines.append(f"- 题目：{_cell(paper.get('标题'))}")
         who = "，".join(_cell(paper.get(k)) for k in ("作者", "年份", "期刊") if paper.get(k))
         if who:
             lines.append(f"- 文献：{who}")
@@ -216,7 +223,7 @@ AGENTS = """# 这个文件夹是什么（给 Codex 和其他 AI 看）
   你（Codex）要替我记一篇时，就在这里新建一个文件，文件名用论文短标题；不要直接改 `阅读进度.json` 和 `阅读进度.md`，它们每次更新都会重新生成。
 
 每篇的字段：
-- `论文`：`标题`、`作者`、`年份`、`期刊`、`DOI`
+- `论文`：`标题`、`短标题`（几个字，用在表格和提醒里）、`作者`、`年份`、`期刊`、`DOI`
 - `日期`（YYYY-MM-DD）、`状态`（已读完 / 读了一部分 / 暂停）、`采用`（采用 / 暂不采用 / 部分采用）
 - `一句话结论`、`我的评价`、`标签`（数组）
 - `主要结论`：数组，每项 `编号`、`结论`、`支持范围`、`证据强度`
@@ -267,7 +274,7 @@ function run(argv) {
 def reminder_items(papers: list[dict]) -> list[dict]:
     items = []
     for p in papers:
-        title = str((p.get("论文") or {}).get("标题") or "").strip()
+        title = short_title(p)
         for step in _items(p.get("下一步")):
             if not isinstance(step, dict) or not str(step.get("要做的事") or "").strip():
                 continue
